@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  /* Botanical Typography */
+  --font-serif: 'Newsreader', serif;
+  --font-sans: 'Manrope', sans-serif;
+  --font-headline: 'Newsreader', serif;
+  --font-body: 'Manrope', sans-serif;
+
+  /* Core Surface Philosophy Colors */
+  --color-background: #f9f9f7;
+  --color-on-background: #1a1c1b;
+  --color-surface: #f9f9f7;
+  --color-on-surface-variant: #424842;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f4f2;
+  
+  /* Primary Verdant Tones */
+  --color-primary: #042510;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1b3b24;
+  --color-on-primary-container: #82a688;
+  
+  /* Secondary Mossy Tones */
+  --color-secondary-container: #d0e5d2;
+  --color-on-secondary-container: #546758;
+  
+  /* Tertiary Gold Accents */
+  --color-tertiary-container: #463100;
+  --color-tertiary-fixed: #ffdea5;
+  --color-on-tertiary-fixed: #261900;
+  --color-tertiary-fixed-dim: #e9c176;
+}
+
+/* Base styles required by the Design System */
+@layer base {
+  body {
+    @apply bg-background text-on-background font-sans selection:bg-tertiary-fixed-dim selection:text-primary;
+  }
+}
+
+/* Material Icon specific settings */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
