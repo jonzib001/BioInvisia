@@ -4,10 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 function NewObservation() {
   const navigate = useNavigate();
   
-  // State to hold our form data for the future FastAPI backend
+  // State updated to match the new single-species-name schema
   const [formData, setFormData] = useState({
-    topic: '', // Starts empty to show placeholder
+    topic: '', 
     headline: '',
+    speciesName: '', 
     content: '',
     latitude: '',
     longitude: '',
@@ -23,14 +24,92 @@ function NewObservation() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // FUTURE BACKEND LOGIC: 
-    // await axios.post('/api/observations', formData);
-    console.log("Data ready for database:", formData);
     
-    // For now, simulate success and return to dashboard
-    navigate('/researcher-dashboard');
+    // 1. Get the dynamic user_id from localStorage
+    const currentUserId = localStorage.getItem('user_id');
+    
+    if (!currentUserId) {
+      alert("Session expired. Please log in again.");
+      navigate('/login');
+      return;
+    }
+
+    try {
+      let finalSpeciesId = null;
+      const cleanSpeciesName = formData.speciesName.trim();
+
+      // 2. Fetch existing species from your updated backend
+      const speciesResponse = await fetch('http://localhost:8000/species');
+      const speciesData = await speciesResponse.json();
+
+      if (speciesData.status === "success") {
+        // Case-insensitive check to see if the species already exists
+        const existingSpecies = speciesData.data.find(
+          s => s.species_name.toLowerCase() === cleanSpeciesName.toLowerCase()
+        );
+
+        if (existingSpecies) {
+          finalSpeciesId = existingSpecies.species_id;
+          console.log("Found existing species ID:", finalSpeciesId);
+        }
+      }
+
+      // 3. If species doesn't exist, create it in the database
+      if (!finalSpeciesId) {
+        console.log("Species not found. Creating new species record...");
+        
+        const newSpeciesPayload = {
+          species_name: cleanSpeciesName,
+          user_id: parseInt(currentUserId)
+        };
+
+        const createSpeciesRes = await fetch('http://localhost:8000/species', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newSpeciesPayload)
+        });
+        
+        const createSpeciesData = await createSpeciesRes.json();
+
+        if (createSpeciesData.status === "success") {
+          finalSpeciesId = createSpeciesData.species_id;
+          console.log("New species created with ID:", finalSpeciesId);
+        } else {
+          throw new Error(createSpeciesData.message || "Failed to catalog new species.");
+        }
+      }
+
+      // 4. Post the Observation with dynamic user_id and species_id
+      const payload = {
+        user_id: parseInt(currentUserId),
+        species_id: finalSpeciesId,
+        research_content: `[${formData.topic.toUpperCase()}] ${formData.headline}\n\n${formData.content}`,
+        latitude: parseFloat(formData.latitude),
+        longitude: parseFloat(formData.longitude),
+        observed_at: formData.observedAt,
+        is_native: formData.isNative
+      };
+
+      const obsResponse = await fetch('http://localhost:8000/observations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (obsResponse.ok) {
+        const result = await obsResponse.json();
+        console.log("Archive update successful:", result);
+        navigate('/researcher-dashboard');
+      } else {
+        throw new Error("Server rejected the observation data.");
+      }
+
+    } catch (error) {
+      console.error("Workflow Error:", error);
+      alert(`Upload Failed: ${error.message}`);
+    }
   };
 
   return (
@@ -56,7 +135,7 @@ function NewObservation() {
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/login" title="Sign Out">
+            <Link to="/login" title="Sign Out" onClick={() => localStorage.removeItem('user_id')}>
               <span className="material-symbols-outlined text-primary cursor-pointer scale-100 active:scale-95 transition-transform">
                 account_circle
               </span>
@@ -67,7 +146,6 @@ function NewObservation() {
 
       <main className="flex-grow max-w-4xl mx-auto w-full px-6 py-16 md:py-24">
         
-        {/* Page Header */}
         <header className="mb-12 text-center md:text-left">
           <span className="text-tertiary-fixed-dim font-sans font-bold tracking-widest text-xs uppercase mb-4 block">
             Archival Entry
@@ -80,17 +158,15 @@ function NewObservation() {
           </p>
         </header>
 
-        {/* Observation Form */}
         <div className="bg-surface-container-lowest p-8 md:p-12 rounded shadow-[0px_12px_32px_rgba(26,28,27,0.04)] relative overflow-hidden">
           
-          {/* Subtle decorative botanical watermark */}
           <span className="material-symbols-outlined text-[300px] text-surface-container-low absolute -bottom-20 -right-20 pointer-events-none rotate-12 z-0">
             local_florist
           </span>
 
           <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
             
-            {/* 1. Topic Category - Converted to Input */}
+            {/* 1. Topic Category */}
             <div className="group">
               <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
                 1. Topic Category
@@ -121,10 +197,26 @@ function NewObservation() {
               />
             </div>
 
-            {/* 3. Content */}
+            {/* 3. Biological Classification */}
             <div className="group">
               <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
-                3. Full Content
+                3. Species Name
+              </label>
+              <input 
+                type="text"
+                name="speciesName"
+                value={formData.speciesName}
+                onChange={handleChange}
+                required
+                placeholder="e.g., House Sparrow"
+                className="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface font-sans placeholder:text-on-surface-variant/40 focus:ring-0 focus:bg-surface-container-high transition-colors outline-none"
+              />
+            </div>
+
+            {/* 4. Content */}
+            <div className="group">
+              <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
+                4. Full Content
               </label>
               <textarea 
                 name="content"
@@ -137,11 +229,11 @@ function NewObservation() {
               ></textarea>
             </div>
 
-            {/* 4 & 5. Coordinates Grid */}
+            {/* 5 & 6. Coordinates Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="group">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
-                  4. Latitude
+                  5. Latitude
                 </label>
                 <input 
                   type="number"
@@ -156,7 +248,7 @@ function NewObservation() {
               </div>
               <div className="group">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
-                  5. Longitude
+                  6. Longitude
                 </label>
                 <input 
                   type="number"
@@ -171,11 +263,11 @@ function NewObservation() {
               </div>
             </div>
 
-            {/* 6 & 7. Date and Nativity Grid */}
+            {/* 7 & 8. Date and Nativity Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div className="group">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">
-                  6. Observed At
+                  7. Observed At
                 </label>
                 <input 
                   type="datetime-local"
@@ -190,11 +282,10 @@ function NewObservation() {
               <div className="group flex items-center justify-between bg-surface-container-highest px-6 py-4 rounded-md h-full mt-6">
                 <div>
                   <label className="block font-sans text-xs font-semibold tracking-wider text-primary uppercase">
-                    7. Is Native Species?
+                    8. Is Native Species?
                   </label>
                   <span className="text-[10px] text-on-surface-variant font-sans">Verify regional catalog</span>
                 </div>
-                {/* Custom Toggle Switch */}
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 

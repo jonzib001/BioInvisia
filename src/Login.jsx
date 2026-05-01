@@ -1,7 +1,63 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 function Login() {
+  const navigate = useNavigate();
+  
+  // State for form data and error handling
+  const [errorMsg, setErrorMsg] = useState("");
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle backend authentication
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setErrorMsg(""); // Clear old errors
+    
+    try {
+      const response = await fetch('http://localhost:8000/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+
+      if (result.status === "success") {
+        console.log("Logged in successfully:", result);
+
+        localStorage.setItem('user_id', result.user_id)
+        
+        // Dynamic Routing based on Database Role
+        if (result.role === 'researcher') {
+          navigate('/researcher-dashboard');
+        } else {
+          // Captures 'user', 'community member', etc.
+          navigate('/user-dashboard');
+        }
+      } else {
+        // Display backend error (e.g., Invalid credentials)
+        setErrorMsg(result.message);
+      }
+    } catch (error) {
+      console.error("Network Error:", error);
+      setErrorMsg("Could not connect to the BioInvisia backend.");
+    }
+  };
+
   return (
     <main className="min-h-screen flex flex-col relative overflow-hidden bg-surface text-on-surface">
       {/* Subtle Background Element */}
@@ -23,17 +79,28 @@ function Login() {
           <div className="bg-surface-container-lowest p-10 shadow-[0px_12px_32px_rgba(26,28,27,0.04)] rounded-lg">
             <h2 className="font-serif text-2xl text-primary mb-8 text-center italic">Welcome back to the field</h2>
             
-            <form className="space-y-6">
+            {/* Error Message Display */}
+            {errorMsg && (
+              <div className="bg-[#ba1a1a]/10 text-[#ba1a1a] p-3 rounded mb-6 font-sans text-xs text-center border-l-2 border-[#ba1a1a]">
+                {errorMsg}
+              </div>
+            )}
+
+            <form className="space-y-6" onSubmit={handleLogin}>
               <div className="group">
-                <label className="block font-sans text-[10px] uppercase tracking-widest text-tertiary-fixed-dim mb-1 ml-1" htmlFor="email">
-                  Email Address
+                {/* Changed to Username to match your FastAPI/Postgres schema */}
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-tertiary-fixed-dim mb-1 ml-1" htmlFor="username">
+                  Username
                 </label>
                 <input 
                   className="w-full bg-surface-container-high border-none rounded-md px-4 py-3 text-on-surface focus:ring-1 focus:ring-tertiary-fixed-dim transition-all outline-none" 
-                  id="email" 
-                  name="email" 
-                  placeholder="name@institution.org" 
-                  type="email"
+                  id="username" 
+                  name="username" 
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="jvane_field" 
+                  type="text"
+                  required
                 />
               </div>
               
@@ -50,13 +117,20 @@ function Login() {
                   className="w-full bg-surface-container-high border-none rounded-md px-4 py-3 text-on-surface focus:ring-1 focus:ring-tertiary-fixed-dim transition-all outline-none" 
                   id="password" 
                   name="password" 
+                  value={formData.password}
+                  onChange={handleChange}
                   placeholder="••••••••" 
                   type="password"
+                  required
                 />
               </div>
               
               <div className="pt-4">
-                <button className="w-full block text-center bg-primary text-on-primary py-4 font-sans uppercase tracking-widest text-sm font-bold rounded-lg hover:bg-primary-container transition-all active:scale-95 duration-200" type="button">
+                {/* Changed type="button" to type="submit" */}
+                <button 
+                  className="w-full block text-center bg-primary text-on-primary py-4 font-sans uppercase tracking-widest text-sm font-bold rounded-lg hover:bg-primary-container transition-all active:scale-95 duration-200" 
+                  type="submit"
+                >
                   Sign In
                 </button>
               </div>
@@ -81,7 +155,7 @@ function Login() {
       </div>
 
       {/* Login Specific Footer */}
-      <footer className="bg-surface-container-low flex flex-col md:flex-row justify-between items-center w-full px-12 py-12 gap-8 z-10">
+      <footer className="bg-surface-container-low flex flex-col md:flex-row justify-between items-center w-full px-12 py-12 gap-8 z-10 mt-auto">
         <div className="text-xl font-serif italic text-primary">BioInvisia</div>
         <div className="flex flex-wrap justify-center gap-8">
           <a className="font-sans text-sm tracking-wide uppercase text-primary/50 hover:text-tertiary-fixed-dim underline-offset-4 underline opacity-80 transition-opacity" href="#">Ethics Statement</a>

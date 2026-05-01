@@ -6,15 +6,59 @@ function Signup() {
   const [accountType, setAccountType] = useState('researcher');
   const navigate = useNavigate();
 
-  // Function to handle form submission
-  const handleRegistration = (e) => {
+  // New state to hold form data and errors
+  const [errorMsg, setErrorMsg] = useState("");
+  const [formData, setFormData] = useState({
+    fullName: '', // Keeping this to track the input, even if DB doesn't use it yet
+    username: '',
+    email: '',
+    password: ''
+  });
+
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Function to handle form submission with FastAPI backend
+  const handleRegistration = async (e) => {
     e.preventDefault();
-    // In the future, this is where you will send data to FastAPI/Postgres
-    // For now, we simulate success and redirect based on the role
-    if (accountType === 'researcher') {
-      navigate('/researcher-dashboard');
-    } else {
-      navigate('/user-dashboard');
+    setErrorMsg(""); // Clear previous errors
+
+    // Format payload to match FastAPI UserCreate schema
+    const payload = {
+      username: formData.username,
+      email: formData.email,
+      password: formData.password,
+      role: accountType // 'researcher' or 'user'
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.status === "success") {
+        console.log("User created with ID:", result.user_id);
+        // Redirect to login page on successful registration
+        navigate('/login');
+      } else {
+        // Display backend error (e.g., unique constraint / duplicate username)
+        setErrorMsg(result.message);
+      }
+    } catch (error) {
+      console.error("Network Error:", error);
+      setErrorMsg("Could not connect to the BioInvisia backend.");
     }
   };
 
@@ -59,6 +103,14 @@ function Signup() {
 
           {/* Centralized Card */}
           <div className="bg-surface-container-lowest p-8 md:p-12 rounded-lg border-none shadow-[0px_12px_32px_rgba(26,28,27,0.06)] relative z-10">
+            
+            {/* Error Message Display */}
+            {errorMsg && (
+              <div className="bg-[#ba1a1a]/10 text-[#ba1a1a] p-4 rounded mb-6 font-sans text-sm">
+                {errorMsg.includes("unique constraint") ? "Username already taken." : errorMsg}
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleRegistration}>
               
               {/* Account Type Selector */}
@@ -86,6 +138,9 @@ function Signup() {
               <div className="group relative">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">Full Name</label>
                 <input 
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleChange}
                   className="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 focus:bg-surface-container-high transition-colors outline-none" 
                   placeholder="Dr. Julian Vane" 
                   type="text"
@@ -98,6 +153,9 @@ function Signup() {
                 <div className="group relative">
                   <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">Username</label>
                   <input 
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
                     className="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 focus:bg-surface-container-high transition-colors outline-none" 
                     placeholder="jvane_field" 
                     type="text"
@@ -111,6 +169,9 @@ function Signup() {
                     {accountType === 'researcher' ? 'Institutional Email' : 'Email Address'}
                   </label>
                   <input 
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
                     className="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 focus:bg-surface-container-high transition-colors outline-none" 
                     placeholder={accountType === 'researcher' ? "research@bioinvisia.org" : "name@example.com"} 
                     type="email"
@@ -123,6 +184,9 @@ function Signup() {
               <div className="group relative">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-2">Password</label>
                 <input 
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
                   className="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 focus:bg-surface-container-high transition-colors outline-none" 
                   placeholder="••••••••••••" 
                   type="password"
