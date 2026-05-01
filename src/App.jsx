@@ -20,7 +20,7 @@ function App() {
         <Route path="/user-dashboard" element={<UserDashboard />} />
         <Route path="/forum" element={<Forum />} />
         <Route path="/NewObservation" element={<NewObservation />} />
-        <Route path="/ThreadDetail" element={<ThreadDetail />} />
+        <Route path="/ThreadDetail/:id" element={<ThreadDetail />} />
       </Routes>
     </Router>
   );

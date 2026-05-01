@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 function NewObservation() {
   const navigate = useNavigate();
   
-  // State updated to match the new single-species-name schema
   const [formData, setFormData] = useState({
     topic: '', 
     headline: '',
@@ -40,12 +39,11 @@ function NewObservation() {
       let finalSpeciesId = null;
       const cleanSpeciesName = formData.speciesName.trim();
 
-      // 2. Fetch existing species from your updated backend
+      // 2. Fetch existing species
       const speciesResponse = await fetch('http://localhost:8000/species');
       const speciesData = await speciesResponse.json();
 
       if (speciesData.status === "success") {
-        // Case-insensitive check to see if the species already exists
         const existingSpecies = speciesData.data.find(
           s => s.species_name.toLowerCase() === cleanSpeciesName.toLowerCase()
         );
@@ -56,7 +54,7 @@ function NewObservation() {
         }
       }
 
-      // 3. If species doesn't exist, create it in the database
+      // 3. Create new species if needed
       if (!finalSpeciesId) {
         console.log("Species not found. Creating new species record...");
         
@@ -81,11 +79,13 @@ function NewObservation() {
         }
       }
 
-      // 4. Post the Observation with dynamic user_id and species_id
+      // 4. Post the Observation
       const payload = {
         user_id: parseInt(currentUserId),
         species_id: finalSpeciesId,
-        research_content: `[${formData.topic.toUpperCase()}] ${formData.headline}\n\n${formData.content}`,
+        topic: formData.topic,               
+        headline: formData.headline,         
+        research_content: formData.content,  
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
         observed_at: formData.observedAt,
@@ -98,17 +98,21 @@ function NewObservation() {
         body: JSON.stringify(payload)
       });
 
-      if (obsResponse.ok) {
-        const result = await obsResponse.json();
+      // THE FIX: Parse the JSON first, THEN check if it was actually a success
+      const result = await obsResponse.json();
+
+      if (obsResponse.ok && result.status === "success") {
         console.log("Archive update successful:", result);
         navigate('/researcher-dashboard');
       } else {
-        throw new Error("Server rejected the observation data.");
+        // If Postgres threw an error, this will catch it and pop up on your screen!
+        throw new Error(`Database Error: ${result.message}`);
       }
 
     } catch (error) {
       console.error("Workflow Error:", error);
-      alert(`Upload Failed: ${error.message}`);
+      // This alert will show you EXACTLY what is breaking in the backend
+      alert(`Upload Failed:\n${error.message}`);
     }
   };
 

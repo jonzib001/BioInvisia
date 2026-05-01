@@ -19,6 +19,8 @@ app.add_middleware(
 class observationCreate(BaseModel):
     user_id : int
     species_id : int
+    topic : str
+    headline : str
     research_content : str
     latitude: float
     longitude: float
@@ -48,29 +50,41 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
-def fetch_observations(species_id=None, user_id = None, limit=10):
-    curr = conn.cursor() # executes queries
+def fetch_observations(species_id=None, user_id=None, limit=50):
+    curr = conn.cursor() 
+    # Updated query to fetch username, topic, headline, and the new species_name
     query = """
-    select u.user_id, s.genus_name, s.species_name, o.research_content, o.latitude, o.longitude, o.observed_at
-    from observation o
-    join users u on u.user_id = o.user_id
-    join species s on s.species_id = o.species_id
-    where 1=1
+    SELECT 
+        o.observation_id, 
+        u.username, 
+        s.species_name, 
+        o.topic, 
+        o.headline, 
+        o.research_content, 
+        o.latitude, 
+        o.longitude, 
+        o.observed_at
+    FROM observation o
+    JOIN users u ON u.user_id = o.user_id
+    JOIN species s ON s.species_id = o.species_id
+    WHERE 1=1
     """
 
     param = []
 
     if species_id is not None:
-        query += " and o.species_id = %s" # o.species because we usef from observation
+        query += " AND o.species_id = %s" 
         param.append(species_id)
     if user_id is not None:
-        query += " and o.user_id = %s"
+        query += " AND o.user_id = %s"
         param.append(user_id)
-    query += " LIMIT %s"
+        
+    # Order by newest first
+    query += " ORDER BY o.observation_id DESC LIMIT %s"
     param.append(limit)
 
     try:
-        curr.execute(query,param)
+        curr.execute(query, param)
         rows = curr.fetchall()
         return rows
     except Exception as e:
@@ -95,17 +109,17 @@ def get_observations (species_id: int = None, user_id: int = None):
 
     for row in rows:
         obs = {
-           "user_id" : row[0],
-           "species" : {
-               "genus" : row[1],
-               "species" : row[2]
-           },
-           "research_content" : row[3],
-           "location" : {
-               "latitude" : row[4],
-               "longitude" : row[5]
-           },
-           "observed_at" : str(row[6]) 
+            "observation_id": row[0],
+            "author_name": row[1],    # Grabbed from the users table join
+            "species_name": row[2],   # Updated to match new schema
+            "topic": row[3],          # New column
+            "headline": row[4],       # New column
+            "research_content": row[5],
+            "location": {
+                "latitude": row[6],
+                "longitude": row[7]
+            },
+            "observed_at": str(row[8]) 
         }
 
         data.append(obs)
@@ -193,14 +207,16 @@ def create_observation(obs: observationCreate):
 
     query = """
     INSERT INTO observation 
-    (user_id, species_id, research_content, latitude, longitude,is_native, observed_at)
-    VALUES (%s, %s, %s, %s, %s,%s,%s)
+    (user_id, species_id, topic, headline, research_content, latitude, longitude,is_native, observed_at)
+    VALUES (%s, %s, %s, %s, %s,%s,%s,%s,%s)
     RETURNING observation_id;
     """
 
     values = (
         obs.user_id,
         obs.species_id,
+        obs.topic,
+        obs.headline,
         obs.research_content,
         obs.latitude,
         obs.longitude,

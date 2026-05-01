@@ -1,28 +1,13 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 function ThreadDetail() {
   const navigate = useNavigate();
+  const { id } = useParams(); // Grab the observation_id from the URL
 
-  // Mock data for the article
-  const article = {
-    category: "Methodology",
-    time: "Updated 2h ago",
-    title: "Autonomous re-forestation drones: A field report",
-    author: "Julian Vane",
-    authorAvatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuBDJNhl1vXDxDHtF5cSDY9D72e66RYUB2p2QEi_3t_22zBQQ2S-sHbP2VVjd78OBBVH8YasnV0lJqP6yPlPj0ZJjfs6GKsb6TDs_SEFKBzd_W6MvZ58VZH7oXV_WWm_az3C935hBlQe-BcSj8gMQZ2jFJ5EWPXX2GlJtEi9ROyg8Z0KzzYWJVBRbCHvUuHQXKM6XVUnPcCdv2tbqTAqF20vG9j5-q_MORYqeARlZJdNeB0Lwmnz9w8AsG816vYYLnipkhc-Qy08F_-U",
-    content: [
-      "We deployed the Mk-IV seed-dispersal drones over a 50-hectare burn scar in the northern quadrant of the Pacific Northwest biome. Initial seedling survival rates are currently tracking at 62%, which is highly promising compared to the 34% baseline of traditional manual broadcasting.",
-      "The primary advantage of the Mk-IV system is its localized soil-density scanning. The drones do not simply drop seeds; they pneumatically embed them into viable soil pockets, avoiding rock faces and heavy ash deposits. However, battery life at high altitudes remains a severe limitation. The cold temperatures drastically reduce the lithium-ion efficiency, forcing the drones to return to the charging base every 14 minutes.",
-      "We are looking for collaborators with expertise in solid-state battery thermal management, or meteorologists who can help us model micro-climate wind patterns to optimize flight paths and save energy."
-    ],
-    metadata: {
-      latitude: "47.6062",
-      longitude: "-122.3321",
-      observedAt: "Oct 12, 2024",
-      isNative: true
-    }
-  };
+  // Dynamic Article State
+  const [article, setArticle] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Interactive State
   const [isLiked, setIsLiked] = useState(false);
@@ -30,7 +15,7 @@ function ThreadDetail() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [newComment, setNewComment] = useState("");
 
-  // Mock Comments State
+  // Mock Comments State (Preserved for the next step!)
   const [comments, setComments] = useState([
     {
       id: 1,
@@ -61,6 +46,34 @@ function ThreadDetail() {
     }
   ]);
 
+  // Fetch the specific observation from the backend
+  useEffect(() => {
+    const fetchObservation = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/observations');
+        const result = await response.json();
+        
+        if (result.status === "success") {
+          // Find the observation that matches the ID in the URL
+          const foundArticle = result.data.find(obs => obs.observation_id === parseInt(id));
+          setArticle(foundArticle);
+        }
+      } catch (error) {
+        console.error("Failed to fetch article:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchObservation();
+  }, [id]);
+
+  // Formatting helper for the date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   // Handlers
   const handleLikeToggle = () => {
     setIsLiked(!isLiked);
@@ -89,10 +102,32 @@ function ThreadDetail() {
     setNewComment("");
   };
 
+  // Render a loading state while fetching from PostgreSQL
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface text-primary font-serif italic text-2xl">
+        Accessing Archive...
+      </div>
+    );
+  }
+
+  // Handle case where URL ID doesn't match any database record
+  if (!article) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface text-center px-6">
+        <h1 className="font-serif text-4xl text-primary mb-4 italic">Record Not Found</h1>
+        <p className="font-sans text-on-surface-variant mb-8">This field note may have been removed or reclassified.</p>
+        <button onClick={() => navigate('/forum')} className="bg-primary text-on-primary px-8 py-3 font-sans text-xs font-bold uppercase tracking-widest rounded-sm">
+          Return to Forum
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-surface text-on-background font-sans selection:bg-tertiary-fixed-dim selection:text-primary min-h-screen flex flex-col">
       
-      {/* TopNavBar - Restored Standard Navigation */}
+      {/* TopNavBar */}
       <nav className="bg-surface sticky top-0 z-50 border-b border-[#c2c8c0]/20">
         <div className="flex justify-between items-center w-full px-12 h-20 max-w-screen-2xl mx-auto">
           <Link className="text-2xl font-serif text-primary italic tracking-tight" to="/">
@@ -128,7 +163,7 @@ function ThreadDetail() {
         {/* Article Container */}
         <article className="max-w-screen-md mx-auto w-full px-6 py-12 md:py-16">
           
-          {/* Relocated Return Button */}
+          {/* Return Button */}
           <div className="mb-12">
             <button 
               onClick={() => navigate(-1)} 
@@ -143,55 +178,58 @@ function ThreadDetail() {
           <header className="mb-12">
             <div className="flex justify-between items-center mb-6">
               <span className="text-tertiary-fixed-dim font-sans text-xs font-extrabold tracking-widest uppercase">
-                {article.category}
+                {article.topic || "General"}
               </span>
               <span className="text-on-surface-variant font-sans text-xs">
-                {article.time}
+                Observed: {formatDate(article.observed_at)}
               </span>
             </div>
             <h1 className="font-serif text-5xl md:text-6xl text-primary leading-tight mb-8">
-              {article.title}
+              {article.headline || "Untitled Field Note"}
             </h1>
             
             <div className="flex items-center gap-4 pb-8 border-b border-[#c2c8c0]/20">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-highest">
-                <img src={article.authorAvatar} alt={article.author} className="w-full h-full object-cover" />
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-highest flex items-center justify-center">
+                <span className="material-symbols-outlined text-on-surface-variant">person</span>
               </div>
               <div>
-                <p className="font-sans font-bold text-primary">{article.author}</p>
+                <p className="font-sans font-bold text-primary">{article.author_name}</p>
                 <p className="font-sans text-xs text-on-surface-variant uppercase tracking-widest">Lead Researcher</p>
               </div>
             </div>
           </header>
 
-          {/* Body */}
+          {/* Body (Dynamically maps paragraphs based on line breaks!) */}
           <div className="space-y-8 mb-16">
-            {article.content.map((paragraph, idx) => (
+            {article.research_content.split('\n').filter(p => p.trim() !== '').map((paragraph, idx) => (
               <p key={idx} className="font-sans text-lg text-on-surface-variant leading-relaxed">
                 {paragraph}
               </p>
             ))}
           </div>
 
-          {/* Optional: Metadata Specimen Card */}
+          {/* Metadata Specimen Card */}
           <div className="bg-surface-container-lowest p-6 border-l-2 border-tertiary-fixed-dim mb-16 shadow-[0px_12px_32px_rgba(26,28,27,0.02)]">
             <span className="block font-sans text-[10px] text-tertiary-fixed-dim font-bold uppercase tracking-widest mb-4">Observation Data</span>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Latitude</p>
-                <p className="font-sans font-bold text-primary text-sm">{article.metadata.latitude}</p>
+                <p className="font-sans font-bold text-primary text-sm">{article.location?.latitude || "N/A"}</p>
               </div>
               <div>
                 <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Longitude</p>
-                <p className="font-sans font-bold text-primary text-sm">{article.metadata.longitude}</p>
+                <p className="font-sans font-bold text-primary text-sm">{article.location?.longitude || "N/A"}</p>
               </div>
               <div>
-                <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Observed</p>
-                <p className="font-sans font-bold text-primary text-sm">{article.metadata.observedAt}</p>
+                <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Species</p>
+                <p className="font-sans font-bold text-primary text-sm italic">{article.species_name || "Unknown"}</p>
               </div>
               <div>
-                <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Nativity</p>
-                <p className="font-sans font-bold text-primary text-sm">{article.metadata.isNative ? "Native Species" : "Non-Native"}</p>
+                <p className="font-sans text-[10px] uppercase text-on-surface-variant tracking-wider mb-1">Status</p>
+                {/* Checks if is_native exists in response, otherwise defaults */}
+                <p className="font-sans font-bold text-primary text-sm">
+                  {article.is_native === undefined ? "Unverified" : article.is_native ? "Native" : "Non-Native"}
+                </p>
               </div>
             </div>
           </div>
@@ -229,12 +267,11 @@ function ThreadDetail() {
 
         </article>
 
-        {/* Discussion / Comments Section */}
+        {/* Discussion / Comments Section (Mocked for now) */}
         <section className="bg-surface-container-low py-16 md:py-24 border-t border-[#c2c8c0]/20">
           <div className="max-w-screen-md mx-auto w-full px-6">
             <h2 className="font-serif text-3xl italic text-primary mb-12">Collective Discussion</h2>
 
-            {/* Comment Input */}
             <form onSubmit={handleCommentSubmit} className="mb-16">
               <div className="bg-surface-container-lowest p-6 rounded shadow-[0px_12px_32px_rgba(26,28,27,0.04)]">
                 <label className="block font-sans text-xs font-semibold tracking-wider text-tertiary-fixed-dim uppercase mb-4">
@@ -259,11 +296,9 @@ function ThreadDetail() {
               </div>
             </form>
 
-            {/* Comments List */}
             <div className="space-y-10">
               {comments.map(comment => (
                 <div key={comment.id} className="group">
-                  {/* Parent Comment */}
                   <div className="flex gap-4">
                     <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-surface-container-highest mt-1">
                       <img src={comment.avatar} alt={comment.author} className="w-full h-full object-cover" />
@@ -287,7 +322,6 @@ function ThreadDetail() {
                     </div>
                   </div>
 
-                  {/* Nested Replies */}
                   {comment.replies.length > 0 && (
                     <div className="ml-14 mt-6 space-y-6 border-l-2 border-tertiary-fixed-dim/30 pl-6">
                       {comment.replies.map(reply => (
